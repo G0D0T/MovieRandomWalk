@@ -1,15 +1,13 @@
 import networkx as nx
 import numpy as np
 import pandas as pd
-import random as rdm
-import matplotlib.pyplot as plt
-#import csv
+import secrets as sc
 
-def extract_neigh(node, t = 0.8):
+def extract_neigh(node, t = 0.75):
 	neig = sorted(node.items(), key=lambda edge: edge[1]['rating'])
 	threshold = int(len(neig)*t)
 	neig = neig[threshold:]
-	next = rdm.choice(neig)
+	next = sc.choice(neig)
 	return next[0]
 
 def consigli(reccomend, filt):
@@ -30,12 +28,19 @@ movie_ratings.drop("timestamp", inplace = True, axis = 1)
 movie_ratings.drop("movieId", inplace = True, axis = 1)
 movie_ratings.drop("genres", inplace = True, axis = 1)
 
-print(movie_ratings.sample(10))
+#print(movie_ratings.sample(10))
 
 G = nx.from_pandas_edgelist(movie_ratings, 'userId', 'title', ['rating'])
 movie_ratings.to_csv('import.csv', index=False)
 print(nx.info(G))
 #nx.write_weighted_edgelist(G, 'movie.weighted.edgelist')
+
+newUser = 777
+G.add_edge(newUser, 'The Machinist (2004)', rating=5.0)
+G.add_edge(newUser, 'Harry Potter and the Prisoner of Azkaban (2004)', rating=4.0)
+G.add_edge(newUser, 'Toy Story (1995)', rating=5.0)
+G.add_edge(newUser, 'Pulp Fiction (1994)', rating=5.0)
+G.add_edge(newUser, 'The Mask', rating=4.0)
 
 #print(G[184]['Flint (2017)']['rating']) #test
 #print([n for n in G.neighbors(2)]) #vedo tutti i film visti da un certo utente
@@ -43,28 +48,33 @@ print(nx.info(G))
 #print([n for n in G.neighbors('Whiplash (2014)')]) #vedo tutti gli utenti che hanno visto un certo film
 
 numSteps = 10
-step = 0
-flag = False #True per gli utenti, viceversa per i film
+#step = 0
+#flag = False #True per gli utenti, viceversa per i film
 walk = []
 visitedFilm = []
 visitedUser = []
-start = 1 #da sostituire con l'id utente che vuole avere un consiglio
+start = 777 #da sostituire con l'id utente che vuole avere un consiglio
 giavisti = ([n for n in G.neighbors(start)])#.items()
 
 def main():	
-	global step
-	global flag
+	step = 0
+	flag = False
 	walk.append(start)
 	visitedUser.append(start)
 	for f in giavisti:
 		visitedFilm.append(f)
 	nodo = start
-	prev = start
+	#prev = start
 	primoF = True
+	endd = 0
 
-	while step < numSteps:
+	while (step < numSteps) and (endd < 30):
+		if endd > 15:
+			nodo = visitedFilm[-2]
+		endd += 1
 		nodo = extract_neigh(G[nodo])
-		print(nodo)
+		#print(nodo)
+		#print(prev)
 		if flag:
 			if nodo not in visitedUser:
 				visitedUser.append(nodo)			
@@ -77,6 +87,7 @@ def main():
 			elif primoF:
 				primoF = False
 				flag = not flag
+				prev = nodo
 				continue
 			else:
 				nodo = prev
@@ -93,12 +104,6 @@ main()
 
 """
 film visti per esempio
-'The Machinist (2004)'
-'Harry Potter and the Prisoner of Azkaban (2004)'
-'Toy Story (1995)'
-'Pulp Fiction (1994)'
-'The Mask'
-
 
 for x in G.nodes():
       print ("Node:", x, "has total #degree:",G.degree(x), " , In_degree: ", G.out_degree(x)," and out_degree: ", G.in_degree(x))   
