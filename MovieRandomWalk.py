@@ -1,7 +1,8 @@
 import networkx as nx
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+#from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 import secrets as sc #per la funzione random
 from collections import Counter
 
@@ -30,7 +31,12 @@ movie_ratings.drop("movieId", inplace = True, axis = 1)
 movie_ratings.drop("genres", inplace = True, axis = 1)
 movie_ratings.to_csv('import.csv', index=False)
 
-train, test = train_test_split(movie_ratings, test_size=0.5)
+#train, test = train_test_split(movie_ratings, test_size=0.5)
+#TRAIN=0.75/TEST=0.25
+kf = KFold(n_splits = 4, shuffle = True)#, random_state = 0)
+result = next(kf.split(movie_ratings), None)
+train = movie_ratings.iloc[result[0]]
+test =  movie_ratings.iloc[result[1]]
 print('Numero righe del train set: ',len(train))
 print('Numero righe del test set: ',len(test))
 #print(movie_ratings.sample(10))
@@ -50,25 +56,25 @@ print('------------------------------------------------')
 
 #aggiungo un nuovo utente con relativi film visti al train set
 newUser = 777
-Gtrain.add_edge(newUser, 'The Machinist (2004)', rating=5.0)
+Gtrain.add_edge(newUser, 'The Machinist (2004)', rating=3.0)
 Gtrain.add_edge(newUser, 'Harry Potter and the Prisoner of Azkaban (2004)', rating=4.0)
 Gtrain.add_edge(newUser, 'Toy Story (1995)', rating=5.0)
 Gtrain.add_edge(newUser, 'Pulp Fiction (1994)', rating=5.0)
 Gtrain.add_edge(newUser, 'The Mask', rating=4.0)
-Gtrain.add_edge(newUser, 'Raiders of the Lost Ark (Indiana Jones and the Raiders of the Lost Ark) (1981)', rating=5.0)
+Gtrain.add_edge(newUser, 'Raiders of the Lost Ark (Indiana Jones and the Raiders of the Lost Ark) (1981)', rating=4.5)
 Gtrain.add_edge(newUser, 'Shawshank Redemption, The (1994)', rating=5.0)
 Gtrain.add_edge(newUser, 'Mission: Impossible - Rogue Nation (2015)', rating=2.0)
-Gtrain.add_edge(newUser, 'Back to the Future (1985)', rating=5.0)
+Gtrain.add_edge(newUser, 'Back to the Future (1985)', rating=4.5)
 #idem per il test set
-Gtest.add_edge(newUser, 'The Machinist (2004)', rating=5.0)
+Gtest.add_edge(newUser, 'The Machinist (2004)', rating=3.0)
 Gtest.add_edge(newUser, 'Harry Potter and the Prisoner of Azkaban (2004)', rating=4.0)
 Gtest.add_edge(newUser, 'Toy Story (1995)', rating=5.0)
 Gtest.add_edge(newUser, 'Pulp Fiction (1994)', rating=5.0)
 Gtest.add_edge(newUser, 'The Mask', rating=4.0)
-Gtest.add_edge(newUser, 'Raiders of the Lost Ark (Indiana Jones and the Raiders of the Lost Ark) (1981)', rating=5.0)
+Gtest.add_edge(newUser, 'Raiders of the Lost Ark (Indiana Jones and the Raiders of the Lost Ark) (1981)', rating=4.5)
 Gtest.add_edge(newUser, 'Shawshank Redemption, The (1994)', rating=5.0)
 Gtest.add_edge(newUser, 'Mission: Impossible - Rogue Nation (2015)', rating=2.0)
-Gtest.add_edge(newUser, 'Back to the Future (1985)', rating=5.0)
+Gtest.add_edge(newUser, 'Back to the Future (1985)', rating=4.5)
 
 #parametri globali
 ripetizioni = 10000
