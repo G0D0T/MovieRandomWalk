@@ -1,19 +1,9 @@
-import networkx as nx
+import networkx as nx #per la gestione del grafo
 import numpy as np
 import pandas as pd
-#from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold #per lo split del train e test set
 import secrets as sc #per la funzione random
 from collections import Counter
-
-#funzione per estrarre il prossimo nodo in modo casuale, con la probabilità condizionata dal rating
-#la variabile t serve a limitare il sottoinsieme di nodi da estrarre: più il valore è alto e più nodi saranno filtrati
-def extract_neigh(node, t = 0.75):
-	neig = sorted(node.items(), key=lambda edge: edge[1]['rating'])
-	threshold = int(len(neig)*t)
-	neig = neig[threshold:]
-	next = sc.choice(neig)
-	return next[0]
 
 #set dei tipi delle colonne del dataset per una lettura più agevole
 typesMovies = {'movieId': np.dtype(int),'title': np.dtype(str),'genres' : np.dtype(str)}
@@ -29,11 +19,11 @@ movie_ratings = pd.merge(movies, ratings)
 movie_ratings.drop("timestamp", inplace = True, axis = 1)
 movie_ratings.drop("movieId", inplace = True, axis = 1)
 movie_ratings.drop("genres", inplace = True, axis = 1)
-movie_ratings.to_csv('import.csv', index=False)
+#movie_ratings.to_csv('import.csv', index=False)
 
 #train, test = train_test_split(movie_ratings, test_size=0.5)
-#TRAIN=0.75/TEST=0.25
-kf = KFold(n_splits = 4, shuffle = True)#, random_state = 0)
+#TRAIN=0.9/TEST=0.1
+kf = KFold(n_splits = 10, shuffle = True)#, random_state = 0)
 result = next(kf.split(movie_ratings), None)
 train = movie_ratings.iloc[result[0]]
 test =  movie_ratings.iloc[result[1]]
@@ -43,149 +33,121 @@ print('Numero righe del test set: ',len(test))
 print('------------------------------------------------')
 
 #generazione del grafo train
-Gtrain = nx.from_pandas_edgelist(train, 'userId', 'title', ['rating'])
-Gtrain.name = 'Train_Set'
-print(nx.info(Gtrain))
+Grafo = nx.from_pandas_edgelist(train, 'userId', 'title', ['rating'])
+Grafo.name = 'Train_Set'
+print(nx.info(Grafo))
 print('------------------------------------------------')
-#generazione del grafo test
-Gtest = nx.from_pandas_edgelist(test, 'userId', 'title', ['rating'])
-Gtest.name = 'Test_Set'
-print(nx.info(Gtest))
-#nx.write_weighted_edgelist(G, 'movie.weighted.edgelist')
-print('------------------------------------------------')
+print('ATTENDERE...')
 
-#aggiungo un nuovo utente con relativi film visti al train set
-newUser = 777
-Gtrain.add_edge(newUser, 'The Machinist (2004)', rating=3.0)
-Gtrain.add_edge(newUser, 'Harry Potter and the Prisoner of Azkaban (2004)', rating=4.0)
-Gtrain.add_edge(newUser, 'Toy Story (1995)', rating=5.0)
-Gtrain.add_edge(newUser, 'Pulp Fiction (1994)', rating=5.0)
-Gtrain.add_edge(newUser, 'The Mask', rating=4.0)
-Gtrain.add_edge(newUser, 'Raiders of the Lost Ark (Indiana Jones and the Raiders of the Lost Ark) (1981)', rating=4.5)
-Gtrain.add_edge(newUser, 'Shawshank Redemption, The (1994)', rating=5.0)
-Gtrain.add_edge(newUser, 'Mission: Impossible - Rogue Nation (2015)', rating=2.0)
-Gtrain.add_edge(newUser, 'Back to the Future (1985)', rating=4.5)
-#idem per il test set
-Gtest.add_edge(newUser, 'The Machinist (2004)', rating=3.0)
-Gtest.add_edge(newUser, 'Harry Potter and the Prisoner of Azkaban (2004)', rating=4.0)
-Gtest.add_edge(newUser, 'Toy Story (1995)', rating=5.0)
-Gtest.add_edge(newUser, 'Pulp Fiction (1994)', rating=5.0)
-Gtest.add_edge(newUser, 'The Mask', rating=4.0)
-Gtest.add_edge(newUser, 'Raiders of the Lost Ark (Indiana Jones and the Raiders of the Lost Ark) (1981)', rating=4.5)
-Gtest.add_edge(newUser, 'Shawshank Redemption, The (1994)', rating=5.0)
-Gtest.add_edge(newUser, 'Mission: Impossible - Rogue Nation (2015)', rating=2.0)
-Gtest.add_edge(newUser, 'Back to the Future (1985)', rating=4.5)
-
-#parametri globali
-ripetizioni = 10000
-numSteps = 2 #lunghezza prevista della random walk
-top = 25
+#variabili e contatori vari
+ripetere = 1000
+passi = 3
+hit = 0
+hit5 = 0
+hit10 = 0
+hit15 = 0
+superhit = 0
+top = 5
+visitatiF = []
+visitatiU = []
 walk = []
-visitedFilm = []
-visitedUser = []
-start = 777 #da sostituire con l'id utente che vuole avere un consiglio
 
-def run (grafo):
-	giavisti = ([n for n in grafo.neighbors(start)])	
-	step = 0
-	flag = False #True per gli utenti, viceversa per i film
-	visitedUser.append(start)
-	for f in giavisti:
-		visitedFilm.append(f) #salvo i film già visionati per evitare di consigliarli di nuovo
+temp = 0
+
+#funzione che estrae il prossimo "hop" della random walk
+def extract_neigh(node, t = 0.75):
+	neig = sorted(node.items(), key=lambda edge: edge[1]['rating'])
+	threshold = int(len(neig)*t)
+	neig = neig[threshold:]
+	next = sc.choice(neig)
+	return next[0]
+
+#funzione che ritorna il "traguardo" della random walk
+def randomwalk(start):
+	visti = ([n for n in Grafo.neighbors(start)])
+	for f in visti:
+		visitatiF.append(f)
+	visitatiU.append(start)
 	nodo = start
-	#prev = start
-	primoF = True #flag che indica se ci troviamo ad aggiungere il primo film
-
-	for i in range(0,ripetizioni):	
-		while (step < numSteps): 
-			nodo = extract_neigh(grafo[nodo])
-			#print(nodo)
-			#print(prev)
-			if flag:
-				if nodo not in visitedUser:
-					visitedUser.append(nodo)			
-				else:			#nel caso il nodo sia già stato visitato, passo alla prossima iterazione
-					nodo = prev
-					continue
+	step = 0
+	tempc = 0
+	tempcc = 0	
+	while step < passi:
+		nodo = extract_neigh(Grafo[nodo])
+		#se il nodo ha valore int o meno viene gestito come userId o film
+		if (isinstance(nodo, int)):
+			if nodo in visitatiU:
+				if tempc > 7:
+					break
+				tempc += 1
+				nodo = prev
+				continue
 			else:
-				if nodo not in visitedFilm:
-					visitedFilm.append(nodo)
-				elif primoF:
-					primoF = False
-					flag = not flag
-					prev = nodo
-					continue
-				else:
-					nodo = prev
-					continue
-
-			#walk.append(nodo) #il nodo trovato in questa iterazione è nuovo, quindi devo aggiornare i seguenti parametri
-			prev = nodo
-			flag = not flag
-			step += 1
-			#print('------------------------------------------------')
+				visitatiU.append(nodo)
+		else:
+			if step == 0:
+				pass#do nothing				
+			elif nodo in visitatiF:
+				if tempcc > 7:
+					break
+				tempcc += 1
+				nodo = prev
+				continue
+			else:
+				visitatiF.append(nodo)
 		
-		#Salvataggio del film trovato con l'ultima walk
-		walk.append(visitedFilm[-1])
-		#reset dei vari parametri
-		nodo = start
-		primoF = True
-		flag = False
-		step = 0
-		visitedUser.clear()
-		visitedUser.append(start)
-		visitedFilm.clear()
-		for f in giavisti:
-			visitedFilm.append(f)
+		step += 1
+		prev = nodo
 	
+	res = visitatiF[-1]
+	visitatiF.clear()
+	visitatiU.clear()
+	return res
+			
+for index, row in test.iterrows():
+	temp += 1	
+	user = row['userId']
+	film = row['title']
+	for i in range(0, ripetere): 
+		r = randomwalk(user)
+		walk.append(r)
 	#conta delle occorrenze dei film durante le ripetizioni della random walk + ordinamento
-	res = sorted(Counter(walk).items(), key=lambda x: x[1], reverse=True)
-	for r in res[:top]:
-		print(r)
-		
-	return res[:top]
+	consigli = sorted(Counter(walk).items(), key=lambda x: x[1], reverse=True)
+	walk.clear()
+	#controllo del film in lista:
+	#SuperHit = primo della lista -> stesso film del test set
+	#Top = il film è in alto nella lista dei suggerimenti
+	#Hit = il film è nella lista dei suggerimenti
+	if film == consigli[0][0]:
+		superhit += 1
+	for i in range(0,len(consigli)):		
+		if film in consigli[i][0]:
+			hit += 1
+		if film in consigli[i][0] and i < top:	
+			hit5 += 1
+		elif film in consigli[i][0] and i < top+5:	
+			hit10 += 1
+		elif film in consigli[i][0] and i < top+10:	
+			hit15 += 1
+	#la top 15 dei suggerimenti viene stampata all'interno di un file
+	with open("o.txt", "a") as f:
+		print("Film suggeriti per l'utente: ", user, film, file=f)
+		for elem in consigli[:top+10]:
+			print(elem, file=f)			
+	#stampa a schermo dei vari contatori a ogni iterazione
+	print(temp, hit, hit5, hit10, hit15, superhit)
 
-print('Consigli TRAIN set')
-trainlista = run(Gtrain)
-walk.clear()
-visitedUser.clear()
-visitedFilm.clear()
+#calcolo della precisione dei suggerimenti e stampa (su file)
+tot = len(test.index)
+accuracy5 = hit5/tot
+accuracy10 = hit10/tot
+accuracy15 = hit15/tot
 print('------------------------------------------------')
-print('Consigli TEST set')
-print('------------------------------------------------')
-testlista = run(Gtest)
+with open("o.txt", "a") as f:
+	print("RISULTATO FINALE...\n\n")
+	print('Hit: ',hit, file=f)
+	print('Precisione delle top 5: ',accuracy5, hit5, file=f)
+	print('Precisione delle top 10: ',accuracy10, hit10, file=f)
+	print('Precisione delle top 15: ',accuracy15, hit15, file=f)
+	print('SuperHit: ', superhit, file=f)
 
-#dopo aver eseguito le walk sia su train che test, si stima la precisione dei suggerimenti
-conta = 0
-common = []
-for i in range(0,len(trainlista)):
-	for j in range(0,len(testlista)):
-		if trainlista[i][0] == testlista[j][0]:
-			common.append(testlista[j])
-			conta +=1
-
-#controllo dei film suggeriti in entrambi i set e stampa a schermo la top 5
-conta /= top
-print("\n\nAccuracy: ", conta)
-print('------------------------------------------------')
-print("\nTitoli suggeriti (in ordine di attinenza")
-common.sort(key=lambda x: x[1], reverse=True)
-for elem in common[:5]:
-	print (elem[0])
-
-"""
-funzioni utils
-#print([n for n in G.neighbors(2)]) #vedo tutti i film visti da un certo utente
-#print(G[2]) #vedo tutti i film visti da un certo utente con voto assegnato
-#print([n for n in G.neighbors('Whiplash (2014)')]) #vedo tutti gli utenti che hanno visto un certo film
-for x in G.nodes():
-      print ("Node:", x, "has total #degree:",G.degree(x), " , In_degree: ", G.out_degree(x)," and out_degree: ", G.in_degree(x))
-	  for u,v in G.edges():
-      print ("Weight of Edge ("+str(u)+","+str(v)+")", G.get_edge_data(u,v))	  
-	  
-	  Data = open('ratings.csv', "r")
-next(Data, None)  # skip the first line in the input file
-Graphtype = nx.Graph()  #undirected
-
-G = nx.parse_edgelist(Data, delimiter=';', create_using=Graphtype, nodetype=int, data=(('rating', float),))
-"""	  
